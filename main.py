@@ -12,13 +12,14 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from mne import read_labels_from_annot
 
-from helpers import retrieve_track_run, shuffle_nt_arr
+from helpers import retrieve_track_run, shuffle_nt_arr, reorder_prop_delays
 
 neu_dir = Path("/Volumes/shares/NEU")
 dwi_dir = neu_dir / 'Projects' / 'DWI'
 meg_dir = neu_dir / 'Projects' / 'CTF_MEG'
-
+fs_subjects_dir = neu_dir / 'Data' / 'derivatives' / 'freesurfer-6.0.0'
 
 if __name__ == "__main__":
 
@@ -52,10 +53,23 @@ if __name__ == "__main__":
     nt_arr[np.diag_indices_from(nt_arr)] = 0
 
     # TODO: loop through all available runs
-    delay_path = subj_meg_dir / 'dSPM' / 'run_07' / 'propagation_delays.csv'
-    delays = np.loadtxt(
-        fname=delay_path, 
+    delay_path = subj_meg_dir / 'dSPM' / 'run_07' / 'propagation_delays_fs-order.csv'
+    fs_delays = np.loadtxt(
+        fname=delay_path,
         delimiter=','
+    )
+
+    fs_annot = read_labels_from_annot(
+        subject=f'sub-{pnum}_ses-clinical',
+        subjects_dir=fs_subjects_dir,
+        parc=f'Schaefer2018_{n_parcs}Parcels_17Networks_order'
+    )
+    del fs_annot[-2:] # delete medial wall parcels
+    dwi_labels = pd.read_csv((prob_dir / run_num / 'roi_labels.txt'), header=None, names=['label'])
+    delays = reorder_prop_delays(
+        fs_delays=fs_delays,
+        fs_annot=fs_annot,
+        dwi_labels=dwi_labels
     )
 
     source_parc_idx = np.argwhere(delays == 0).squeeze()
